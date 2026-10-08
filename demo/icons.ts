@@ -13,6 +13,8 @@ export const ICONS: Record<string, string> = {
   emoji: svg('<circle cx="14" cy="14" r="8.5"/><path d="M10.5 16.2c1.8 2 5.2 2 7 0"/><circle cx="11" cy="12" r=".6" fill="currentColor"/><circle cx="17" cy="12" r=".6" fill="currentColor"/>'),
   magnet: svg('<path d="M8 6v8a6 6 0 0 0 12 0V6h-4v8a2 2 0 0 1-4 0V6z"/><path d="M8 9.5h4M16 9.5h4"/>'),
   keep: svg('<path d="m17.5 5.5 5 5L11 22H6v-5z"/><path d="m15 8 5 5"/>'),
+  eye: svg('<path d="M4 14c2.6-4.6 6-7 10-7s7.4 2.4 10 7c-2.6 4.6-6 7-10 7s-7.4-2.4-10-7z"/><circle cx="14" cy="14" r="3"/>'),
+  eyeOff: svg('<path d="M4 14c2.6-4.6 6-7 10-7s7.4 2.4 10 7c-2.6 4.6-6 7-10 7s-7.4-2.4-10-7z"/><circle cx="14" cy="14" r="3"/><path d="M6 22 22 6"/>'),
   trash: svg('<path d="M6 8h16M11 8V5.5h6V8M8 8l1 14.5h10L20 8M12 12v7M16 12v7"/>'),
   download: svg('<path d="M14 5v12M9 12.5l5 5 5-5M6 22h16"/>'),
   upload: svg('<path d="M14 18V6M9 10.5l5-5 5 5M6 22h16"/>'),

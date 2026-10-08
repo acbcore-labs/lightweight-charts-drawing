@@ -61,6 +61,8 @@ intraday of date labels), `stayInDrawingMode` (TV Keep drawing).
 | `setTool(kind \| null, { glyph? })`, `tool()` | arm / disarm a tool (`kind` from docs/TOOLS.md) |
 | `setMagnet(mode)`, `setInterval(i)`, `setStayInDrawingMode(on)` | settings |
 | `add(drawing)`, `update(drawing)`, `remove(id)`, `clear()`, `get(id)`, `drawings()` | drawings |
+| `setHidden(id, hidden)` | hide / show one drawing without removing it (the drawing's `hidden` flag, saved with it) |
+| `setDrawingsVisible(visible)`, `drawingsVisible()` | hide / show every drawing at once (TV "Hide all drawings"; not saved, the drawings are untouched) |
 | `select(ids)`, `selection()` | selection (multi-select with Ctrl / Cmd) |
 | `bringToFront(id)`, `sendToBack(id)` | z-order |
 | `toggleAnchored(id)` | TV "Anchor drawing" for Text, Pin and Table: the drawing keeps its pane position when the chart scrolls (`isAnchorable(kind)`) |
@@ -71,6 +73,7 @@ intraday of date labels), `stayInDrawingMode` (TV Keep drawing).
 | `redraw()`, `destroy()` | |
 
 Events: `change`, `add`, `update`, `remove`, `selection`, `tool`,
+`visibility` (every drawing hidden / shown again),
 `textEdit` (a text tool was placed or double-clicked: open your editor at
 the given pane point and `update` the drawing's `text`), `tableEdit` (a click
 on a cell of the selected table: open your editor over the given cell box),
@@ -83,6 +86,10 @@ click to multi-select and group drag, Ctrl + body drag clones; Shift = 45°
 steps / square boxes and magnet off, Ctrl / Cmd inverts the magnet; Escape
 drops pending points, then the tool, then the selection; Delete removes the
 selection (locked drawings stay).
+
+Drawing flags: `locked` (selectable, but no drag and no Delete) and `hidden`
+(not drawn, hit or selected). A drawing that gets hidden leaves the
+selection. Arming a tool while every drawing is hidden shows them again.
 
 The host keeps what is not drawing logic: undo stack, storage, settings
 dialogs, text / table editors, toolbar, context menu.

@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `DrawingManager.setHidden(id, hidden)`: hide / show one drawing without
+  removing it (the drawing's `hidden` flag, saved with it).
+- `DrawingManager.setDrawingsVisible(visible)` / `drawingsVisible()` and the
+  `visibility` event: hide / show every drawing at once (TradingView "Hide
+  all drawings"). Not saved, the drawings are untouched. Hiding disarms the
+  tool; arming a tool shows the drawings again.
+- Demo: hide all button, hide button in the selection bar.
+
+### Fixed
+
+- A drawing that stops being shown (`hidden`, per-interval visibility) leaves
+  the selection and the hover: Delete could remove a drawing that was not
+  drawn.
+
 ## 0.4.0 (02/10/2026)
 
 ### Added

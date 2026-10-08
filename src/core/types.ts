@@ -605,9 +605,8 @@ type WithId<T> = T & {
   closed?: boolean;
   /** Locked drawings can be selected but not dragged or deleted via Delete-key. */
   locked?: boolean;
-  /** Hidden drawings are not rendered or hit-tested. Toggle via context menu;
-   *  unhiding from the chart requires re-selecting through the ObjectTreePanel
-   *  (not yet built). */
+  /** Hidden drawings are not rendered, hit-tested or selected; the flag is
+   *  saved with the drawing (DrawingManager.setHidden). */
   hidden?: boolean;
   /** Per-interval visibility matrix (Settings → Visibility). Absent = always
    *  visible (the default for drawings saved before this field existed). */

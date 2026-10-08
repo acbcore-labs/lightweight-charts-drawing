@@ -61,6 +61,9 @@ export type DrawingManagerEvents = {
   selection: (ids: readonly string[]) => void;
   /** The armed tool changed (null = none). */
   tool: (kind: DrawingKind | null) => void;
+  /** Every drawing was hidden or shown again (setDrawingsVisible, or a tool
+   *  armed while they were hidden). */
+  visibility: (visible: boolean) => void;
   /** A text tool was placed (or double-clicked): the host opens its editor
    *  at `screen` (pane coordinates) and calls update with the text. */
   textEdit: (d: Drawing, screen: Pt) => void;
@@ -89,9 +92,11 @@ export class DrawingManager {
   private readonly coords: Coords;
   private readonly primitive: DrawingsPrimitive;
   private readonly el: HTMLElement;
-  private readonly listeners: Listeners = { change: new Set(), add: new Set(), update: new Set(), remove: new Set(), selection: new Set(), tool: new Set(), textEdit: new Set(), gestureEnd: new Set(), tableEdit: new Set() };
+  private readonly listeners: Listeners = { change: new Set(), add: new Set(), update: new Set(), remove: new Set(), selection: new Set(), tool: new Set(), visibility: new Set(), textEdit: new Set(), gestureEnd: new Set(), tableEdit: new Set() };
   private list: Drawing[] = [];
   private selected: string[] = [];
+  /** TV "Hide all drawings": off = nothing is drawn or hit (not saved). */
+  private visible = true;
   private hovered: { id: string; anchor: number } | null = null;
   private spec: OverlaySpec | null = null;
   private glyph: string | undefined;
@@ -145,6 +150,7 @@ export class DrawingManager {
   on(event: "remove", cb: DrawingManagerEvents["remove"]): () => void;
   on(event: "selection", cb: DrawingManagerEvents["selection"]): () => void;
   on(event: "tool", cb: DrawingManagerEvents["tool"]): () => void;
+  on(event: "visibility", cb: DrawingManagerEvents["visibility"]): () => void;
   on(event: "textEdit", cb: DrawingManagerEvents["textEdit"]): () => void;
   on(event: "gestureEnd", cb: DrawingManagerEvents["gestureEnd"]): () => void;
   on(event: "tableEdit", cb: DrawingManagerEvents["tableEdit"]): () => void;
@@ -157,6 +163,9 @@ export class DrawingManager {
    *  the font-icon glyph to place. */
   setTool(kind: DrawingKind | null, o: { glyph?: string } = {}): void {
     const spec = kind ? findOverlaySpec(kind) ?? null : null;
+    // A tool armed while the drawings are hidden shows them again: the new
+    // drawing would be invisible otherwise.
+    if (spec) this.setDrawingsVisible(true);
     this.spec = spec;
     this.glyph = o.glyph;
     this.pending = [];
@@ -172,7 +181,24 @@ export class DrawingManager {
   }
   setInterval(interval: string | undefined): void {
     this.opts.interval = interval;
+    this.dropHidden();
     this.redraw();
+  }
+  /** TV "Hide all drawings": hide / show every drawing without touching
+   *  them (the drawings' own `hidden` flag and the saved JSON stay as they
+   *  are). Hiding disarms the tool and clears the selection. */
+  setDrawingsVisible(visible: boolean): void {
+    if (this.visible === visible) return;
+    this.visible = visible;
+    if (!visible) {
+      if (this.spec) this.setTool(null);
+      this.dropHidden();
+    }
+    this.emit("visibility", visible);
+    this.redraw();
+  }
+  drawingsVisible(): boolean {
+    return this.visible;
   }
   setStayInDrawingMode(on: boolean): void {
     this.opts.stayInDrawingMode = on;
@@ -196,8 +222,16 @@ export class DrawingManager {
     const prev = this.get(d.id);
     if (!prev) return;
     this.list = this.list.map((x) => (x.id === d.id ? d : x));
+    this.dropHidden();
     this.emit("update", d, prev);
     this.changed();
+  }
+  /** Hide / show one drawing (its `hidden` flag, saved with it): a hidden
+   *  drawing is not drawn, hit or selected. */
+  setHidden(id: string, hidden: boolean): void {
+    const d = this.get(id);
+    if (!d || !!d.hidden === hidden) return;
+    this.update({ ...d, hidden } as Drawing);
   }
   remove(id: string): void {
     const d = this.get(id);
@@ -414,7 +448,17 @@ export class DrawingManager {
     this.changed();
   }
   private shown(d: Drawing): boolean {
-    return !d.hidden && (this.opts.interval == null || isVisibleOnInterval(d.visibility, this.opts.interval));
+    return this.visible && !d.hidden && (this.opts.interval == null || isVisibleOnInterval(d.visibility, this.opts.interval));
+  }
+  /** Drawings that are no longer shown leave the selection and the hover:
+   *  Delete must not remove a drawing the user cannot see. */
+  private dropHidden(): void {
+    const isShown = (id: string) => { const d = this.get(id); return !!d && this.shown(d); };
+    if (this.hovered && !isShown(this.hovered.id)) {
+      this.hovered = null;
+      this.hoverCursor = null;
+    }
+    if (!this.selected.every(isShown)) this.select(this.selected.filter(isShown));
   }
   private paneSize(): { w: number; h: number } {
     const idx = this.series.getPane().paneIndex();
