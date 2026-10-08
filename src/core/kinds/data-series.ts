@@ -231,12 +231,17 @@ function firstIndexAtOrAfter(bars: OHLC[], sec: number): number {
 /** The VWAP value at the last bar (TV price-scale label), null when the
  *  anchor is past the data. */
 export function vwapLastValue(d: Drawing, coords: Coords | null): number | null {
-  const anchorSec = timeToSec(d.points[0].time);
-  if (!coords || anchorSec == null) return null;
-  const bars = coords.bars();
-  if (bars.length === 0) return null;
+  return coords ? (vwapLast(d, coords.bars())?.vwap ?? null) : null;
+}
+
+/** The VWAP and its σ at the last bar of `bars` (any bars of the symbol,
+ *  not only a chart's), null when the anchor is past the data. */
+export function vwapLast(d: Drawing, bars: OHLC[]): { vwap: number; sd: number } | null {
+  const anchorSec = d.points[0] ? timeToSec(d.points[0].time) : null;
+  if (anchorSec == null || bars.length === 0) return null;
   const data = vwapData(d, bars, anchorSec, d.style.vwapSource ?? "hlc3");
-  return data.vwap.length > 0 ? data.vwap[data.vwap.length - 1] : null;
+  const k = data.vwap.length - 1;
+  return k >= 0 ? { vwap: data.vwap[k], sd: data.sd[k] } : null;
 }
 
 /** Projected cumulative-VWAP polyline from the anchor bar forward plus the
