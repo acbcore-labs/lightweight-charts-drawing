@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1 (08/10/2026)
+
+### Added
+
+- Core `vwapLast(drawing, bars)` (`src/core/kinds/data-series`): the anchored
+  VWAP and its deviation at the last bar of any bars of the symbol, not only
+  a chart's. `vwapLastValue` is unchanged.
+
 ## 0.5.0 (08/10/2026)
 
 ### Added
