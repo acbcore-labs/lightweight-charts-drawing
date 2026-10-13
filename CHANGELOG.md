@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0 (13/10/2026)
+
+### Added
+
+- `Coords.lowerTimeframe` (optional): bars of the chart symbol on a lower
+  timeframe (`bars(resolution, from)`, `barEnd(time)`, `seconds`). The fixed
+  range and anchored volume profiles are built from them (timeframe by the
+  span of the range: the first of 1, 5, 15, 30, 60, 240 minutes or 1 day
+  giving fewer than 5000 bars) and fall back to the chart bars without it.
+- Core `kinds/vbp-engine`: the volume profile engine (rows, allocation,
+  direction, POC, value area, lower-timeframe choice) shared with the
+  OpenTrader profile studies.
+
+### Changed
+
+- Volume profiles follow the reference rules: high / low rounded to the tick,
+  "Number Of Rows" picks the ticks per row whose row count is closest to the
+  input (rows may pass the high), "Ticks Per Row" rows sit on multiples of the
+  row size, a doji's direction comes from the previous close, the value area
+  adds the larger neighbour row only while it fits in the value area volume,
+  and the POC of equal rows is the one closest to the middle.
+
 ## 0.5.1 (08/10/2026)
 
 ### Added
