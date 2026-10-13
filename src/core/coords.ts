@@ -17,6 +17,18 @@ export type OHLC = {
   volume?: number;
 };
 
+/** Bars of the chart symbol on a lower timeframe (the volume profiles are built from them, as the reference
+ *  app's volume profile study). Optional: without it the profiles use the chart bars. */
+export type LowerTimeframe = {
+  /** Bars on `resolution` ("1", "5", "15", "30", "60", "240", "1D", "1S") from `from` (epoch seconds) on;
+   *  undefined while they load (the host redraws the drawings when they arrive). */
+  bars: (resolution: string, from: number) => OHLC[] | undefined;
+  /** End (epoch seconds) of the chart bar starting at `time`: its interval, a daily bar's session close. */
+  barEnd: (time: number) => number;
+  /** The chart interval is in seconds (its profiles use 1-second bars). */
+  seconds: boolean;
+};
+
 export type Coords = {
   priceToY: (p: number) => number | null;
   yToPrice: (y: number) => number | null;
@@ -67,4 +79,6 @@ export type Coords = {
   /** The chart's display time zone and whether its interval is intraday
    *  (bar times are UTC epoch seconds shown in that zone). */
   timeInfo: () => { timeZone: string; intraday: boolean };
+  /** Lower-timeframe bars of the chart symbol (volume profile drawings); optional. */
+  lowerTimeframe?: LowerTimeframe;
 };
