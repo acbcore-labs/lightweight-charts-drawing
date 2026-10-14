@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `makeCoords(..., getFuture)` (optional 6th argument, `FutureAxis`): bars
+  after the last bar on the symbol's trading calendar, given by the host
+  (`slots(time, lastTime)`, `time(k, lastTime)`). With it a point placed after
+  the last bar takes the open time of its nearest future bar, a future time is
+  drawn on the future bar that holds it (`timeToX`, `xToTime`,
+  `timeToBarIndex`, `barIndexToTime`, `timeToXFallback`). Without it, calendar
+  time with the median bar interval as before.
+
 ## 0.6.0 (13/10/2026)
 
 ### Added
