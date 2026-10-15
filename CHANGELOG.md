@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Drawing points are on whole bars, as in the reference app: a time between
+  two bars (a point drawn on another interval, a time in a gap between
+  sessions) is drawn on the bar that holds it, the last bar opening at or
+  before it (`timeToX`, `timeToBarIndex`, `timeToXFallback`); it was
+  interpolated between the two bars. The stored time is kept, so the point
+  comes back to its own bar on its own interval.
+- Drags follow the reference line tool rules: a point that stays on its bar
+  keeps its stored time (price-only anchor drags and body moves), a point
+  moved to another bar takes that bar's open time (`applyDrag`,
+  `translateDrawing`).
+
+### Added
+
+- `FutureAxis.pastSlots` / `pastTime` (optional): bars before the first
+  loaded bar on the host's trading calendar (whole bars both ways); without
+  them, calendar time with the median bar interval as before.
+- `FutureAxis.timeKey` (optional): where a time sits when the bar that holds
+  it is looked for (a host maps a daily bar time to its session open).
+- `FutureAxis` exported from the package entry.
+- Unit tests (`npm test`, vitest).
+
 ## 0.6.1 (15/10/2026)
 
 ### Added

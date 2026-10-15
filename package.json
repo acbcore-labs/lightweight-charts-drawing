@@ -23,7 +23,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "demo": "vite --config vite.demo.config.ts",
-    "build:demo": "vite build --config vite.demo.config.ts"
+    "build:demo": "vite build --config vite.demo.config.ts",
+    "test": "vitest run"
   },
   "peerDependencies": {
     "lightweight-charts": "^5.0.0"
@@ -33,7 +34,8 @@
     "lightweight-charts": "^5.2.1",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
-    "vite-plugin-dts": "^4.3.0"
+    "vite-plugin-dts": "^4.3.0",
+    "vitest": "^3.2.7"
   },
   "keywords": [
     "trading",

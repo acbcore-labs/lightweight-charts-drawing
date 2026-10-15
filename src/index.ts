@@ -11,7 +11,7 @@
 
 // ============ Runtime ============
 export { DrawingManager, type DrawingManagerEvents, type DrawingManagerOptions, type MagnetMode, type TableOp } from "./runtime/manager";
-export { makeCoords, timeToXFallback } from "./runtime/coords";
+export { makeCoords, timeToXFallback, type FutureAxis } from "./runtime/coords";
 export { drawScene, TV_ANCHOR_COLOR, type AnchorStyle, type CanvasSceneOptions } from "./runtime/scene-canvas";
 
 // ============ Core model ============

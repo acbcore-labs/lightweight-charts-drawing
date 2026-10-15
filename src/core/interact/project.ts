@@ -31,7 +31,26 @@ export function translateDrawing(coords: Coords, d: Drawing, startScreen: Pt[], 
     if (!u) return null;
     next.push(u);
   }
+  // Reference rule: a move that leaves every point on its bar changes the
+  // prices only, the stored times stay (a point drawn on another interval
+  // keeps its own time); a move to other bars puts every point on the open
+  // time of its new bar.
+  if (keepsBars(coords, d.points, next)) {
+    return replaceDrawingPoints(d, next.map((p, i) => ({ time: d.points[i]?.time ?? p.time, price: p.price })));
+  }
   return replaceDrawingPoints(d, next);
+}
+
+/** True when every moved point is on the bar of its stored point. */
+function keepsBars(coords: Coords, from: DataPoint[], to: DataPoint[]): boolean {
+  if (from.length !== to.length) return false;
+  for (let i = 0; i < from.length; i++) {
+    if (from[i].time === to[i].time) continue;
+    const a = coords.timeToBarIndex(from[i].time);
+    const b = coords.timeToBarIndex(to[i].time);
+    if (a == null || b == null || a !== b) return false;
+  }
+  return true;
 }
 
 export function projectPoint(coords: Coords, p: DataPoint): Pt | null {

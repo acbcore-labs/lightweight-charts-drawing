@@ -197,6 +197,34 @@ export function applyDrag(
   snap: (p: DataPoint) => DataPoint,
   constrain = false,
 ): Drawing | null {
+  return keepTimesOnSameBars(coords, state.start, dragged(state, cursor, coords, snap, constrain));
+}
+
+/** Reference rule (line tool setPoint / endMoving): a point that stays on its
+ *  bar keeps its stored time, only its price changes (a point drawn on another
+ *  interval keeps its own time); a point moved to another bar takes that bar's
+ *  open time. */
+function keepTimesOnSameBars(coords: Coords, start: Drawing, d: Drawing | null): Drawing | null {
+  if (!d || d.points.length !== start.points.length) return d;
+  let changed = false;
+  const pts = d.points.map((p, i) => {
+    const s = start.points[i];
+    if (p.time === s.time) return p;
+    const a = coords.timeToBarIndex(s.time);
+    if (a == null || a !== coords.timeToBarIndex(p.time)) return p;
+    changed = true;
+    return { time: s.time, price: p.price };
+  });
+  return changed ? ({ ...d, points: pts } as Drawing) : d;
+}
+
+function dragged(
+  state: DragState,
+  cursor: Pt,
+  coords: Coords,
+  snap: (p: DataPoint) => DataPoint,
+  constrain: boolean,
+): Drawing | null {
   const spec = findOverlaySpec(state.start.kind);
   // Shift on ANCHOR drags: the TV per-tool `setPoint` rules (./shift). Most
   // adjust the cursor the anchor path below applies; a few rewrite the drawing.

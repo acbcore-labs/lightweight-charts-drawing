@@ -16,14 +16,26 @@ import type { Coords, OHLC } from "../core/coords";
  *  imported so no lightweight-charts runtime is pulled in). */
 const PRICE_SCALE_MODE_LOG = 1;
 
-/** Bars after the last bar on the symbol's trading calendar (the host knows the sessions). The time scale continues
+/** The symbol's trading calendar around the loaded bars (the host knows the sessions). The time scale continues
  *  after the last bar with the bars the symbol would open: the rest of the session, then the next sessions (nights,
- *  weekends and holidays skipped). Times are epoch seconds. */
+ *  weekends and holidays skipped); before the first loaded bar it counts the bars the symbol had. Times are epoch
+ *  seconds. A time is drawn on the bar that holds it (the last bar opening at or before it). */
 export type FutureAxis = {
   /** Future bars that open after `lastTime` and at or before `time` (0 = still on the last bar). */
   slots: (time: number, lastTime: number) => number;
   /** Open time of the k-th future bar (k >= 1), null past the host's range. */
   time: (k: number, lastTime: number) => number | null;
+  /** Bars from the bar that holds `time` to the first loaded bar (opening at `firstTime`), that bar counted
+   *  (>= 1 for a time before the first bar). Absent = calendar time with the median bar interval. */
+  pastSlots?: (time: number, firstTime: number) => number;
+  /** Open time of the k-th bar before the first loaded bar (k >= 1), null past the host's range. Give it with
+   *  `pastSlots`. */
+  pastTime?: (k: number, firstTime: number) => number | null;
+  /** Where a time sits when the bar that holds it is looked for, non-decreasing over the bar times. The host maps a
+   *  daily bar time to its session open (the reference opens a daily bar there: a pre-market time belongs to the
+   *  previous daily bar, a point drawn on a daily bar goes to the first intraday bar of its day). Identity when
+   *  absent. */
+  timeKey?: (time: number) => number;
 };
 
 export function makeCoords(
@@ -57,7 +69,7 @@ export function makeCoords(
       if (raw.length === 0) return null;
       const sec = timeAsSec(t);
       if (sec == null) return null;
-      const logical = futureLogical(raw, sec, getFuture()) ?? logicalForSec(raw, sec);
+      const logical = logicalForSec(raw, sec, getFuture());
       if (logical == null) return null;
       return logicalToX(chart, logical);
     },
@@ -76,6 +88,13 @@ export function makeCoords(
         const ft = future.time(k, lastSec);
         if (ft != null) return ft as Time;
       }
+      const firstSec = timeAsSec(raw[0].time);
+      if (future?.pastTime && firstSec != null && logical < 0) {
+        const k = Math.round(-logical);
+        if (k <= 0) return raw[0].time;
+        const pt = future.pastTime(k, firstSec);
+        if (pt != null) return pt as Time;
+      }
       const iv = barIntervalSec(raw);
       if (iv <= 0) return null;
       return Math.round(lastSec + (logical - (raw.length - 1)) * iv) as Time;
@@ -86,28 +105,9 @@ export function makeCoords(
       if (raw.length === 0) return null;
       const sec = timeAsSec(t);
       if (sec == null) return null;
-      const lastIdx = raw.length - 1;
-      const lastSec = timeAsSec(raw[lastIdx].time);
-      const firstSec = timeAsSec(raw[0].time);
-      const future = lastSec != null && sec > lastSec ? getFuture() : null;
-      if (future && lastSec != null) return lastIdx + future.slots(sec, lastSec);
-      const iv = barIntervalSec(raw);
-      // Off-data: extrapolate against the nearest edge with the median interval.
-      if (lastSec != null && sec > lastSec) return Math.round(lastIdx + (sec - lastSec) / iv);
-      if (firstSec != null && sec < firstSec) return Math.round((sec - firstSec) / iv);
-      // Within the loaded range: the nearest bar's index (handles gaps).
-      let best = 0;
-      let bestD = Infinity;
-      for (let i = 0; i < raw.length; i++) {
-        const bs = timeAsSec(raw[i].time);
-        if (bs == null) continue;
-        const d = Math.abs(bs - sec);
-        if (d < bestD) {
-          bestD = d;
-          best = i;
-        }
-      }
-      return best;
+      // The bar that holds the time (off the loaded bars: counted on the host's calendar, else rounded calendar time).
+      const logical = logicalForSec(raw, sec, getFuture());
+      return logical == null ? null : Math.round(logical);
     },
     barIndexToTime: (i) => {
       const raw = getRaw();
@@ -116,9 +116,16 @@ export function makeCoords(
       const lastIdx = raw.length - 1;
       const lastSec = timeAsSec(raw[lastIdx].time);
       if (lastSec == null) return null;
-      const future = i > lastIdx ? getFuture() : null;
-      const ft = future ? future.time(i - lastIdx, lastSec) : null;
-      if (ft != null) return ft as Time;
+      const future = getFuture();
+      if (future && i > lastIdx) {
+        const ft = future.time(i - lastIdx, lastSec);
+        if (ft != null) return ft as Time;
+      }
+      const firstSec = timeAsSec(raw[0].time);
+      if (future?.pastTime && firstSec != null && i < 0) {
+        const pt = future.pastTime(-i, firstSec);
+        if (pt != null) return pt as Time;
+      }
       const iv = barIntervalSec(raw);
       return Math.round(lastSec + (i - lastIdx) * iv) as Time;
     },
@@ -207,60 +214,56 @@ function barIntervalSec(raw: OHLC[]): number {
   return deltas[Math.floor(deltas.length / 2)];
 }
 
-/** Fractional logical index (0 = first loaded bar) for an arbitrary time.
- *  `timeToCoordinate` only resolves times that land exactly on a bar, so a
- *  finer-resolution time (e.g. a minute anchor shown on a daily chart) lands
- *  here. Within the loaded range we interpolate between the two bracketing
- *  bars' integer positions — this honours real gaps (weekends/holidays), so a
- *  drawing keeps its place across timeframes. Only off-data (before the first
- *  or after the last bar) do we extrapolate with the median interval, since
- *  there are no real bars to interpolate against. */
-function logicalForSec(raw: OHLC[], sec: number): number | null {
+/** Logical index (0 = first loaded bar) of an arbitrary time: the bar that
+ *  holds it. `timeToCoordinate` only resolves times that land exactly on a
+ *  bar, so a time of another interval (e.g. a 5 minute point shown on a 1 hour
+ *  chart) lands here. The reference draws points on whole bars: a time between
+ *  two bars, in a gap between sessions included, is on the last bar opening at
+ *  or before it (compared with the host's `timeKey`). The stored time is kept,
+ *  so the point comes back to its own bar on its own interval. Off the loaded
+ *  bars the host's calendar counts the bars; without it, calendar time with the
+ *  median bar interval (fractional). */
+function logicalForSec(raw: OHLC[], sec: number, future?: FutureAxis | null): number | null {
   const n = raw.length;
   const firstSec = timeAsSec(raw[0].time);
   const lastSec = timeAsSec(raw[n - 1].time);
   if (firstSec == null || lastSec == null) return null;
-  if (sec >= lastSec) {
+  const key = future?.timeKey ?? ((t: number) => t);
+  const k = key(sec);
+  if (k >= key(lastSec)) {
+    if (future) return n - 1 + future.slots(sec, lastSec);
+    if (sec <= lastSec) return n - 1;
     const iv = barIntervalSec(raw);
     return iv > 0 ? n - 1 + (sec - lastSec) / iv : null;
   }
-  if (sec <= firstSec) {
+  if (k < key(firstSec)) {
+    if (future?.pastSlots) return -future.pastSlots(sec, firstSec);
     const iv = barIntervalSec(raw);
     return iv > 0 ? (sec - firstSec) / iv : null;
   }
-  // In range: binary-search the last bar at or before `sec`, then interpolate.
+  return holderIndex(raw, k, key);
+}
+
+/** Index of the bar that holds a time of key `k` (the last bar whose key is at or before it), for a time within the
+ *  loaded range. */
+function holderIndex(raw: OHLC[], k: number, key: (t: number) => number): number {
   let lo = 0;
-  let hi = n - 1;
+  let hi = raw.length - 1;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
     const ms = timeAsSec(raw[mid].time);
-    if (ms != null && ms <= sec) lo = mid;
+    if (ms != null && key(ms) <= k) lo = mid;
     else hi = mid - 1;
   }
-  const aSec = timeAsSec(raw[lo].time);
-  const bSec = lo + 1 < n ? timeAsSec(raw[lo + 1].time) : null;
-  if (aSec == null) return lo;
-  if (bSec == null || bSec <= aSec) return lo;
-  return lo + (sec - aSec) / (bSec - aSec);
-}
-
-/** Logical index of a time after the last bar on the host's future axis: the
- *  future bar that holds it (whole bars, as the time scale has no position
- *  between two future bars). Null when the time is not after the last bar or
- *  there is no future axis. */
-function futureLogical(raw: OHLC[], sec: number, future: FutureAxis | null | undefined): number | null {
-  if (!future) return null;
-  const lastSec = timeAsSec(raw[raw.length - 1].time);
-  if (lastSec == null || sec <= lastSec) return null;
-  return raw.length - 1 + future.slots(sec, lastSec);
+  return lo;
 }
 
 /** Pixel x for a (possibly fractional) logical index. lightweight-charts'
  *  `logicalToCoordinate` only returns a correct value for *integer* indices —
  *  a fractional index yields 0 — so we interpolate linearly between the two
  *  bracketing integer indices. The logical axis is uniform in pixels, so this
- *  is exact and gives sub-bar precision (e.g. an intraday time placed partway
- *  through a daily bar). */
+ *  is exact (used off the loaded bars without a host calendar, where calendar
+ *  time gives fractional indices). */
 function logicalToX(chart: IChartApi, logical: number): number | null {
   const ts = chart.timeScale();
   const lo = Math.floor(logical);
@@ -275,12 +278,12 @@ function logicalToX(chart: IChartApi, logical: number): number | null {
 
 /** Shared time→x with the off-bar fallback, for non-drawing renderers (event
  *  markers, etc.) that paint at arbitrary times. Mirrors the `timeToX` method:
- *  try lightweight-charts' exact mapping first, then the gap-aware logical
- *  interpolation (future bars on `future` when given). `sec` is UNIX seconds.
- *  Returns null with no data. */
+ *  try lightweight-charts' exact mapping first, then the bar that holds the
+ *  time (off the loaded bars: the host's calendar `future` when given).
+ *  `sec` is UNIX seconds. Returns null with no data. */
 export function timeToXFallback(chart: IChartApi, sec: number, bars: OHLC[], future?: FutureAxis | null): number | null {
   if (bars.length === 0) return null;
-  const logical = futureLogical(bars, sec, future) ?? logicalForSec(bars, sec);
+  const logical = logicalForSec(bars, sec, future);
   if (logical == null) return null;
   return logicalToX(chart, logical);
 }
